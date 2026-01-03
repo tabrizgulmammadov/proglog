@@ -1,4 +1,4 @@
-package log
+package log_test
 
 import (
 	"io"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	api "github.com/tabrizgulmammadov/proglog/api/v1"
+	log "github.com/tabrizgulmammadov/proglog/internal/log"
 )
 
 func TestSegment(t *testing.T) {
@@ -14,13 +15,13 @@ func TestSegment(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	want := &api.Record{Value: []byte("hello world")}
-	c := Config{}
+	c := log.Config{}
 	c.Segment.MaxStoreBytes = 1024
-	c.Segment.MaxIndexBytes = entWidth * 3
+	c.Segment.MaxIndexBytes = log.EntWidth * 3
 
-	s, err := newSegment(dir, 16, c)
+	s, err := log.NewSegment(dir, 16, c)
 	require.NoError(t, err)
-	require.Equal(t, uint64(16), s.nextOffset, s.nextOffset)
+	require.Equal(t, uint64(16), s.NextOffset, s.NextOffset)
 	require.False(t, s.IsMaxed())
 
 	for i := uint64(0); i < 3; i++ {
@@ -42,7 +43,7 @@ func TestSegment(t *testing.T) {
 	c.Segment.MaxStoreBytes = uint64(len(want.Value) * 3)
 	c.Segment.MaxIndexBytes = 1024
 
-	s, err = newSegment(dir, 16, c)
+	s, err = log.NewSegment(dir, 16, c)
 	require.NoError(t, err)
 
 	// maxed store
@@ -51,7 +52,7 @@ func TestSegment(t *testing.T) {
 	err = s.Remove()
 	require.NoError(t, err)
 
-	s, err = newSegment(dir, 16, c)
+	s, err = log.NewSegment(dir, 16, c)
 	require.NoError(t, err)
 	require.False(t, s.IsMaxed())
 }

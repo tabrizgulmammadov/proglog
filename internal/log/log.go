@@ -18,8 +18,8 @@ type Log struct {
 	Dir    string
 	Config Config
 
-	activeSegment *segment
-	segments      []*segment
+	activeSegment *Segment
+	segments      []*Segment
 }
 
 func NewLog(dir string, c Config) (*Log, error) {
@@ -99,15 +99,15 @@ func (l *Log) Read(off uint64) (*api.Record, error) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
-	var s *segment
+	var s *Segment
 	for _, segment := range l.segments {
-		if segment.baseOffset <= off && off < segment.nextOffset {
+		if segment.baseOffset <= off && off < segment.NextOffset {
 			s = segment
 			break
 		}
 	}
 
-	if s == nil || s.nextOffset <= off {
+	if s == nil || s.NextOffset <= off {
 		return nil, api.ErrOffsetOutOfRange{Offset: off}
 	}
 
@@ -154,7 +154,7 @@ func (l *Log) HighestOffset() (uint64, error) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
-	off := l.segments[len(l.segments)-1].nextOffset
+	off := l.segments[len(l.segments)-1].NextOffset
 	if off == 0 {
 		return 0, nil
 	}
@@ -166,9 +166,9 @@ func (l *Log) Truncate(lowest uint64) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	var segments []*segment
+	var segments []*Segment
 	for _, s := range l.segments {
-		if s.nextOffset <= lowest+1 {
+		if s.NextOffset <= lowest+1 {
 			if err := s.Remove(); err != nil {
 				return err
 			}
@@ -195,7 +195,7 @@ func (l *Log) Reader() io.Reader {
 }
 
 type originReader struct {
-	*store
+	*Store
 	off int64
 }
 
@@ -207,7 +207,7 @@ func (o *originReader) Read(p []byte) (int, error) {
 }
 
 func (l *Log) newSegment(off uint64) error {
-	s, err := newSegment(l.Dir, off, l.Config)
+	s, err := NewSegment(l.Dir, off, l.Config)
 	if err != nil {
 		return err
 	}

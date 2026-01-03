@@ -1,15 +1,16 @@
-package log
+package log_test
 
 import (
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	log "github.com/tabrizgulmammadov/proglog/internal/log"
 )
 
 var (
 	write = []byte("hello world")
-	width = uint64(len(write) + lenWidth)
+	width = uint64(len(write) + log.LenWidth)
 )
 
 func TestStoreAppendRead(t *testing.T) {
@@ -17,19 +18,19 @@ func TestStoreAppendRead(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
-	s, err := newStore(f)
+	s, err := log.NewStore(f)
 	require.NoError(t, err)
 
 	testAppend(t, s)
 	testRead(t, s)
 	testReadAt(t, s)
 
-	s, err = newStore(f)
+	s, err = log.NewStore(f)
 	require.NoError(t, err)
 	testRead(t, s)
 }
 
-func testAppend(t *testing.T, s *store) {
+func testAppend(t *testing.T, s *log.Store) {
 	t.Helper()
 
 	for i := uint64(1); i < 4; i++ {
@@ -39,7 +40,7 @@ func testAppend(t *testing.T, s *store) {
 	}
 }
 
-func testRead(t *testing.T, s *store) {
+func testRead(t *testing.T, s *log.Store) {
 	t.Helper()
 
 	var pos uint64
@@ -51,17 +52,17 @@ func testRead(t *testing.T, s *store) {
 	}
 }
 
-func testReadAt(t *testing.T, s *store) {
+func testReadAt(t *testing.T, s *log.Store) {
 	t.Helper()
 
 	for i, off := uint64(1), int64(0); i < 4; i++ {
-		b := make([]byte, lenWidth)
+		b := make([]byte, log.LenWidth)
 		n, err := s.ReadAt(b, off)
 		require.NoError(t, err)
-		require.Equal(t, lenWidth, n)
+		require.Equal(t, log.LenWidth, n)
 		off += int64(n)
 
-		size := enc.Uint64(b)
+		size := log.Enc.Uint64(b)
 		b = make([]byte, size)
 		n, err = s.ReadAt(b, off)
 		require.NoError(t, err)
@@ -76,7 +77,7 @@ func TestStoreClose(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
-	s, err := newStore(f)
+	s, err := log.NewStore(f)
 	require.NoError(t, err)
 	_, _, err = s.Append(write)
 	require.NoError(t, err)

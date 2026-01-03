@@ -1,4 +1,4 @@
-package log
+package log_test
 
 import (
 	"io"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	log "github.com/tabrizgulmammadov/proglog/internal/log"
 )
 
 func TestIndex(t *testing.T) {
@@ -13,10 +14,10 @@ func TestIndex(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
-	c := Config{}
+	c := log.Config{}
 	c.Segment.MaxIndexBytes = 1024
 
-	idx, err := newIndex(f, c)
+	idx, err := log.NewIndex(f, c)
 	require.NoError(t, err)
 
 	_, _, err = idx.Read(-1)
@@ -46,7 +47,7 @@ func TestIndex(t *testing.T) {
 
 	// index should build its state from the existing file
 	f, _ = os.OpenFile(f.Name(), os.O_RDWR, 0600)
-	idx, err = newIndex(f, c)
+	idx, err = log.NewIndex(f, c)
 	require.NoError(t, err)
 
 	off, pos, err := idx.Read(-1)

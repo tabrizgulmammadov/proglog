@@ -1,4 +1,4 @@
-package log
+package log_test
 
 import (
 	"errors"
@@ -8,12 +8,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 	api "github.com/tabrizgulmammadov/proglog/api/v1"
+	logModule "github.com/tabrizgulmammadov/proglog/internal/log"
 	"google.golang.org/protobuf/proto"
 )
 
 func TestLog(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, log *Log,
+		t *testing.T, log *logModule.Log,
 	){
 		"append and read a record succeeds": testAppendRead,
 		"offset out of range error":         testOutOfRangeErr,
@@ -26,10 +27,10 @@ func TestLog(t *testing.T) {
 			require.NoError(t, err)
 			defer os.RemoveAll(dir)
 
-			c := Config{}
+			c := logModule.Config{}
 			c.Segment.MaxStoreBytes = 32
 
-			log, err := NewLog(dir, c)
+			log, err := logModule.NewLog(dir, c)
 			require.NoError(t, err)
 
 			fn(t, log)
@@ -37,7 +38,7 @@ func TestLog(t *testing.T) {
 	}
 }
 
-func testAppendRead(t *testing.T, log *Log) {
+func testAppendRead(t *testing.T, log *logModule.Log) {
 	append := &api.Record{
 		Value: []byte("hello world"),
 	}
@@ -51,7 +52,7 @@ func testAppendRead(t *testing.T, log *Log) {
 	require.Equal(t, append.Value, read.Value)
 }
 
-func testOutOfRangeErr(t *testing.T, log *Log) {
+func testOutOfRangeErr(t *testing.T, log *logModule.Log) {
 	read, err := log.Read(1)
 	require.Nil(t, read)
 
@@ -60,7 +61,7 @@ func testOutOfRangeErr(t *testing.T, log *Log) {
 	require.Equal(t, uint64(1), apiErr.Offset)
 }
 
-func testInitExisting(t *testing.T, o *Log) {
+func testInitExisting(t *testing.T, o *logModule.Log) {
 	append := &api.Record{
 		Value: []byte("hello world"),
 	}
@@ -80,7 +81,7 @@ func testInitExisting(t *testing.T, o *Log) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), off)
 
-	n, err := NewLog(o.Dir, o.Config)
+	n, err := logModule.NewLog(o.Dir, o.Config)
 	require.NoError(t, err)
 
 	off, err = n.LowestOffset()
@@ -92,7 +93,7 @@ func testInitExisting(t *testing.T, o *Log) {
 	require.Equal(t, uint64(2), off)
 }
 
-func testReader(t *testing.T, log *Log) {
+func testReader(t *testing.T, log *logModule.Log) {
 	append := &api.Record{
 		Value: []byte("hello world"),
 	}
@@ -106,12 +107,12 @@ func testReader(t *testing.T, log *Log) {
 	require.NoError(t, err)
 
 	read := &api.Record{}
-	err = proto.Unmarshal(b[lenWidth:], read)
+	err = proto.Unmarshal(b[logModule.LenWidth:], read)
 	require.NoError(t, err)
 	require.Equal(t, append.Value, read.Value)
 }
 
-func testTruncate(t *testing.T, log *Log) {
+func testTruncate(t *testing.T, log *logModule.Log) {
 	append := &api.Record{
 		Value: []byte("hello world"),
 	}

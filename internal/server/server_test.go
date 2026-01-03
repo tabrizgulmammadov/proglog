@@ -1,4 +1,4 @@
-package server
+package server_test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/tabrizgulmammadov/proglog/internal/auth"
 	"github.com/tabrizgulmammadov/proglog/internal/config"
 	"github.com/tabrizgulmammadov/proglog/internal/log"
+	server "github.com/tabrizgulmammadov/proglog/internal/server"
 	"go.opencensus.io/examples/exporter"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -42,7 +43,7 @@ func TestServer(t *testing.T) {
 		t *testing.T,
 		rootClient api.LogClient,
 		nobodyClient api.LogClient,
-		config *Config,
+		config *server.Config,
 	){
 		"produce/consume a message to/from the log succeeds": testProduceConsume,
 		"produce/consume stream succeeds":                    testProduceConsumeStream,
@@ -62,10 +63,10 @@ func TestServer(t *testing.T) {
 	}
 }
 
-func setupTest(t *testing.T, fn func(*Config)) (
+func setupTest(t *testing.T, fn func(*server.Config)) (
 	rootClient api.LogClient,
 	nobodyClient api.LogClient,
-	cfg *Config,
+	cfg *server.Config,
 	teardown func(),
 ) {
 	t.Helper()
@@ -88,7 +89,7 @@ func setupTest(t *testing.T, fn func(*Config)) (
 
 		tlsCreds := credentials.NewTLS(tlsConfig)
 		opts := []grpc.DialOption{grpc.WithTransportCredentials(tlsCreds)}
-		conn, err := grpc.Dial(l.Addr().String(), opts...)
+		conn, err := grpc.NewClient(l.Addr().String(), opts...)
 		require.NoError(t, err)
 
 		client := api.NewLogClient(conn)
@@ -126,7 +127,7 @@ func setupTest(t *testing.T, fn func(*Config)) (
 	require.NoError(t, err)
 
 	authorizer := auth.New(config.ACLModelFile, config.ACLPolicyFile)
-	cfg = &Config{
+	cfg = &server.Config{
 		CommitLog:  clog,
 		Authorizer: authorizer,
 	}
@@ -156,7 +157,7 @@ func setupTest(t *testing.T, fn func(*Config)) (
 		fn(cfg)
 	}
 
-	server, err := NewGRPCServer(cfg, grpc.Creds(serverCreds))
+	server, err := server.NewGRPCServer(cfg, grpc.Creds(serverCreds))
 	require.NoError(t, err)
 
 	go func() {
@@ -181,7 +182,7 @@ func testProduceConsume(
 	t *testing.T,
 	client,
 	_ api.LogClient,
-	config *Config,
+	config *server.Config,
 ) {
 	ctx := context.Background()
 	want := &api.Record{
@@ -208,7 +209,7 @@ func testConsumePastBoundary(
 	t *testing.T,
 	client,
 	_ api.LogClient,
-	config *Config,
+	config *server.Config,
 ) {
 	ctx := context.Background()
 	produce, err := client.Produce(ctx, &api.ProduceRequest{
@@ -236,7 +237,7 @@ func testProduceConsumeStream(
 	t *testing.T,
 	client,
 	_ api.LogClient,
-	config *Config,
+	config *server.Config,
 ) {
 	ctx := context.Background()
 	records := []*api.Record{{
@@ -292,7 +293,7 @@ func testUnauthorized(
 	t *testing.T,
 	_,
 	client api.LogClient,
-	config *Config,
+	config *server.Config,
 ) {
 	ctx := context.Background()
 
