@@ -20,6 +20,9 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
+
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type CommitLog interface {
@@ -32,8 +35,9 @@ type Authorizer interface {
 }
 
 type Config struct {
-	CommitLog  CommitLog
-	Authorizer Authorizer
+	CommitLog   CommitLog
+	Authorizer  Authorizer
+	GetServerer GetServerer
 }
 
 type subjectContextKey struct{}
@@ -74,7 +78,9 @@ func NewGRPCServer(config *Config, opts ...grpc.ServerOption) (
 		),
 	}
 
-	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	trace.ApplyConfig(trace.Config{
+		DefaultSampler: trace.AlwaysSample(),
+	})
 	err := view.Register(ocgrpc.DefaultServerViews...)
 	if err != nil {
 		return nil, err
@@ -99,6 +105,10 @@ func NewGRPCServer(config *Config, opts ...grpc.ServerOption) (
 	)
 
 	gsrv := grpc.NewServer(opts...)
+
+	hsrv := health.NewServer()
+	hsrv.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthpb.RegisterHealthServer(gsrv, hsrv)
 
 	srv, err := newgrpcServer(config)
 	if err != nil {
@@ -195,6 +205,21 @@ func (s *grpcServer) ConsumeStream(
 			req.Offset++
 		}
 	}
+}
+
+type GetServerer interface {
+	GetServers() ([]*api.Server, error)
+}
+
+func (s *grpcServer) GetServers(
+	ctx context.Context, req *api.GetServersRequest,
+) (*api.GetServersResponse, error) {
+	servers, err := s.GetServerer.GetServers()
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.GetServersResponse{Servers: servers}, nil
 }
 
 func authenticate(ctx context.Context) (context.Context, error) {
