@@ -136,13 +136,13 @@ func (l *DistributedLog) setupRaft(dataDir string) error {
 	}
 
 	if l.config.Raft.Bootstrap && !hasState {
-		config := raft.Configuration{
+		bootstrapConfig := raft.Configuration{
 			Servers: []raft.Server{{
 				ID:      config.LocalID,
 				Address: raft.ServerAddress(l.config.Raft.BindAddr),
 			}},
 		}
-		err = l.raft.BootstrapCluster(config).Error()
+		err = l.raft.BootstrapCluster(bootstrapConfig).Error()
 	}
 
 	return err
@@ -399,17 +399,72 @@ func newLogStore(dir string, c Config) (*logStore, error) {
 }
 
 func (l *logStore) FirstIndex() (uint64, error) {
-	return l.LowestOffset()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	if len(l.segments) == 0 {
+		return 0, nil
+	}
+
+	firstOff := l.segments[0].baseOffset
+	lastOff := l.segments[len(l.segments)-1].NextOffset
+
+	// If the log is empty (no entries written yet), return 0
+	if lastOff == firstOff {
+		return 0, nil
+	}
+
+	return firstOff, nil
 }
 
 func (l *logStore) LastIndex() (uint64, error) {
-	off, err := l.HighestOffset()
-	return off, err
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	if len(l.segments) == 0 {
+		return 0, nil
+	}
+
+	lastOff := l.segments[len(l.segments)-1].NextOffset
+	firstOff := l.segments[0].baseOffset
+
+	// If the log is empty (no entries written yet), return 0
+	if lastOff == firstOff {
+		return 0, nil
+	}
+
+	return lastOff - 1, nil
 }
 
 func (l *logStore) GetLog(index uint64, out *raft.Log) error {
+	// Check if index is valid before reading
+	firstIndex, err := l.FirstIndex()
+	if err != nil {
+		return err
+	}
+	
+	lastIndex, err := l.LastIndex()
+	if err != nil {
+		return err
+	}
+	
+	// If the log is empty, return an error (Raft expects this)
+	if firstIndex == 0 && lastIndex == 0 {
+		return fmt.Errorf("log entry at index %d does not exist: log is empty", index)
+	}
+	
+	// Check if index is out of range
+	if index < firstIndex || index > lastIndex {
+		return fmt.Errorf("log entry at index %d does not exist: out of range [%d, %d]", index, firstIndex, lastIndex)
+	}
+	
+	// Try to read the entry
 	in, err := l.Read(index)
 	if err != nil {
+		// Convert our error to a format Raft understands
+		if _, ok := err.(api.ErrOffsetOutOfRange); ok {
+			return fmt.Errorf("log entry at index %d does not exist", index)
+		}
 		return err
 	}
 

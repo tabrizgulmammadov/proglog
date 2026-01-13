@@ -40,6 +40,10 @@ func NewLog(dir string, c Config) (*Log, error) {
 }
 
 func (l *Log) setup() error {
+	if err := os.MkdirAll(l.Dir, 0755); err != nil {
+		return err
+	}
+
 	files, err := os.ReadDir(l.Dir)
 	if err != nil {
 		return err

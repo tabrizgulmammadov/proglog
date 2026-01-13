@@ -147,10 +147,14 @@ func (a *Agent) setupLog() error {
 	}
 
 	if a.Config.Bootstrap {
-		err = a.log.WaitForLeader(3 * time.Second)
+		// Don't kill the process if we can't see a stable leader quickly
+		if err := a.log.WaitForLeader(10 * time.Second); err != nil {
+			// log but do NOT return error here
+			zap.L().Warn("WaitForLeader timed out; continuing anyway", zap.Error(err))
+		}
 	}
 
-	return err
+	return nil
 }
 
 func (a *Agent) setupServer() error {

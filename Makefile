@@ -50,5 +50,16 @@ compile:
 		--proto_path=.
 
 TAG ?= 0.0.1
+IMAGE_NAME ?= ghcr.io/tabrizgulmammadov/proglog
+
+.PHONY: build-docker
 build-docker:
-	docker build -t github.com/tabrizgulmammadov/proglog:$(TAG) .
+	docker build -t $(IMAGE_NAME):$(TAG) .
+
+.PHONY: push-docker
+push-docker: build-docker
+	docker push $(IMAGE_NAME):$(TAG)
+
+.PHONY: load-kind
+load-kind: build-docker
+	kind load docker-image $(IMAGE_NAME):$(TAG)
